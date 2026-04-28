@@ -2,5 +2,7 @@ node_modules/
 .env
 *.png
 *.jpg
+!docs/*.jpg
+!docs/*.png
 session_data.pkl
 /tmp/

@@ -2,6 +2,8 @@
 
 A self-hosted Telegram bot that automatically tracks spending across Israeli bank accounts and credit cards, categorizes transactions using AI, and provides real-time budget monitoring per category.
 
+<img src="docs/screenshot.jpg" alt="Budget status in Telegram" width="360"/>
+
 ## What it does
 
 - Scrapes transactions from **Isracard**, **Max**, and **Bank Hapoalim** on a schedule
