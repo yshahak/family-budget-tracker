@@ -245,6 +245,25 @@ Bank Hapoalim requires SMS OTP authentication. The flow is:
 
 No session is saved between runs — OTP is required each time you scrape Hapoalim. This is why Hapoalim is triggered manually via the Telegram command rather than on a schedule.
 
+### ⚠️ OTP entry is fragile — read this before debugging
+
+Getting the OTP to actually land in the right input fields on Hapoalim's page was **not straightforward** and required significant trial and error. The page structure is non-obvious:
+
+- Hapoalim's OTP form has multiple hidden inputs alongside the visible digit boxes
+- The OTP watcher identifies inputs by filtering for visible fields with no `id` or `name` attribute
+- Input values must be set via `dispatchEvent` (Angular's change detection ignores direct `.value =` assignment without events)
+- The submit button is identified by class `.btn-red_1` or inner text `"המשך"`
+
+The code in `hapoalim-otp.mjs` logs extensive debug info to help if the OTP stops working — page title, all inputs (type/id/name/visibility), all buttons, and a screenshot saved to `/tmp/hapoalim-otp-page.png`. Check Cloud Run logs after a failed OTP attempt:
+
+```bash
+gcloud logging read "resource.labels.service_name=budget-bot" \
+  --project=$PROJECT --format="value(timestamp,textPayload)" --limit=80 --freshness=10m \
+  | grep -i "otp\|input\|button\|page state"
+```
+
+If the page structure has changed (Hapoalim redesigns their auth page occasionally), you'll need to inspect what `hapoalim-otp.mjs` logs and update the selector logic in the `filled = await page.evaluate(...)` block accordingly.
+
 ---
 
 ## Step 8 — Seed categorization rules (optional but recommended)
