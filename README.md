@@ -64,9 +64,39 @@ Categories are the core of how the system works — every transaction must belon
 
 Budget amounts can also be overridden at runtime via the `/budget` Telegram command without touching the code — those overrides are stored in Firestore and take precedence over the code defaults.
 
-## Getting started
+## Deployment options
 
-See **[LLM_STARTER.md](./LLM_STARTER.md)** for a complete step-by-step setup guide written for AI assistants (Claude, ChatGPT, etc.) to follow with you.
+### Option A — Google Cloud Run (recommended)
+
+The full setup: bot runs 24/7, scrapes on a schedule, sends notifications automatically. Requires a GCP account with billing enabled (~$0–5/month on free tier). See **[LLM_STARTER.md](./LLM_STARTER.md)** for a complete step-by-step guide.
+
+### Option B — Run locally from your computer
+
+No cloud account needed. You run the bot manually whenever you want to fetch transactions. Good for trying it out or if you don't want ongoing infrastructure.
+
+```bash
+cp .env.example .env
+# Fill in .env with your bank credentials and Telegram bot token
+
+node src/index.mjs              # starts the bot (stays running, handles Telegram commands)
+```
+
+Then trigger a scrape by sending `/scrape` won't work in polling mode — instead curl:
+```bash
+curl -X POST localhost:8080/scrape           # fetch Isracard + Max
+node src/scrape-hapoalim-local.mjs           # fetch Hapoalim (OTP via Telegram)
+```
+
+Or run a backfill for a past month:
+```bash
+node src/backfill.mjs --month=2026-03
+```
+
+**Caveats:** The bot process must be running to receive Telegram button taps (category selection, /status, etc.). If you close the terminal, the bot stops. You can leave `node src/index.mjs` running in the background or use a tool like `pm2` to keep it alive.
+
+> ⚠️ Don't run locally while Cloud Run is also active — polling mode clears the webhook and breaks the cloud deployment.
+
+## Getting started
 
 ## Local development
 
