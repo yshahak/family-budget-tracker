@@ -1,0 +1,8 @@
+**/node_modules
+israeli-bank-scrapers/lib
+.env
+*.png
+transactions.json
+login.py
+fetch.mjs
+plans/

@@ -1,0 +1,18 @@
+{
+  "name": "isracard-budget-bot",
+  "version": "1.0.0",
+  "type": "module",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "start": "node src/index.mjs",
+    "scrape": "node -e \"import('./src/pipeline.mjs').then(m => m.runPipeline())\""
+  },
+  "dependencies": {
+    "@google-cloud/firestore": "^7.11.0",
+    "@google/generative-ai": "^0.21.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "node-telegram-bot-api": "^0.66.0",
+    "puppeteer": "^24.40.0"
+  }
+}
