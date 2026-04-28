@@ -202,9 +202,7 @@ gcloud run services update budget-bot \
 
 ## Step 6 — Set up Cloud Scheduler
 
-The scraper is split into two endpoints to save resources:
-- `/scrape` — Isracard + Max (fast, no OTP)
-- `/scrape-hapoalim` — Bank Hapoalim only (slower, session-based)
+Cards (Isracard + Max) run on a schedule. Hapoalim requires OTP so it is triggered manually via the `/hapoalim` Telegram command — no scheduler job needed for it.
 
 ```bash
 PROJECT=YOUR_PROJECT_ID
@@ -233,38 +231,19 @@ gcloud scheduler jobs create http budget-bot-cards-friday \
   --http-method=POST \
   --time-zone="Asia/Jerusalem" \
   --oidc-service-account-email="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
-
-# Hapoalim: once daily Sun–Thu at 10:00
-gcloud scheduler jobs create http budget-bot-hapoalim \
-  --location=$REGION \
-  --schedule="0 10 * * 0,1,2,3,4" \
-  --uri="$SERVICE_URL/scrape-hapoalim" \
-  --http-method=POST \
-  --time-zone="Asia/Jerusalem" \
-  --oidc-service-account-email="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 ```
 
 ---
 
-## Step 7 — First Hapoalim login (OTP required)
+## Step 7 — First Hapoalim scrape (OTP required)
 
-Bank Hapoalim requires SMS OTP on first login. The session is then saved to Firestore and reused for up to 14 days.
+Bank Hapoalim requires SMS OTP authentication. The flow is:
+1. Send `/hapoalim` in your Telegram group
+2. The bot starts the scraper and detects the OTP page automatically
+3. The bot sends a prompt: "📱 פועלים מבקש קוד SMS"
+4. Reply with `/otp [code]` — the bot fills it in and continues
 
-The flow uses a Firestore document (`otp_cache/hapoalim`) as a relay:
-1. The cloud scraper detects the OTP page and polls Firestore waiting for a code
-2. You (locally) write the received SMS code to Firestore
-
-**First-time setup:**
-```bash
-# Make sure .env is filled in locally (copy from .env.example)
-node src/scrape-hapoalim-local.mjs
-# A browser will open. Complete any OTP prompt.
-# Session cookies are saved to Firestore automatically.
-```
-
-**When the session expires** (after ~14 days), the bot will send a Telegram alert with a reminder to run this script again.
-
-To check session health: trigger a scrape via Cloud Scheduler or `curl -X POST $SERVICE_URL/scrape-hapoalim`.
+No session is saved between runs — OTP is required each time you scrape Hapoalim. This is why Hapoalim is triggered manually via the Telegram command rather than on a schedule.
 
 ---
 
@@ -304,8 +283,7 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 | `budget_transactions` | All transactions (dedup, category, Telegram message ID) |
 | `budget_rules` | Merchant → category patterns |
 | `budget_amounts` | Per-bucket monthly amount overrides (edited via /budget) |
-| `hapoalim_session` | Hapoalim browser cookies for session persistence |
-| `otp_cache` | Temporary OTP relay between Cloud Run and local script |
+| `otp_cache` | Temporary OTP code relay (`/otp` command → scraper) |
 
 ---
 
@@ -313,9 +291,64 @@ gcloud logging read "resource.type=cloud_run_revision AND resource.labels.servic
 
 Edit `src/budget.mjs` to change bucket names, amounts, or which categories roll up into each bucket. Run `/budget` in Telegram to edit amounts without redeployment (stored in Firestore).
 
-## Adding more scrapers
+## Adding a new bank or credit card source
 
-Add a new entry to the `profiles` array in `src/config.mjs` with a supported `company` value from [israeli-bank-scrapers](https://github.com/eshaham/israeli-bank-scrapers/blob/master/src/definitions.ts) and the matching credential env vars.
+The bot can scrape any source supported by [israeli-bank-scrapers](https://github.com/eshaham/israeli-bank-scrapers/blob/master/src/definitions.ts). Walk the user through these steps:
+
+### Step A — Identify the scraper company ID
+
+Open the `CompanyTypes` enum in `israeli-bank-scrapers/src/definitions.ts` (or the library's README) and find the key for the new bank. Common values: `leumi`, `discount`, `mizrahi`, `visaCal`, `beinleumi`, `amex`, `yahav`.
+
+### Step B — Gather credentials
+
+Ask the user what credentials the bank requires (username/password, ID number, card digits, etc.). These vary by scraper — check the library docs or the existing profiles in `src/config.mjs` for examples.
+
+### Step C — Add secrets to Secret Manager
+
+```bash
+echo -n "value" | gcloud secrets create MY_BANK_USER --data-file=- --project=$PROJECT
+echo -n "value" | gcloud secrets create MY_BANK_PASS --data-file=- --project=$PROJECT
+```
+
+### Step D — Add a profile in `src/config.mjs`
+
+```js
+{
+  name: 'my-bank',              // internal key stored in Firestore — NEVER change after first run
+  displayName: 'שם לתצוגה',    // shown in Telegram messages
+  company: 'leumi',             // CompanyTypes key
+  credentials: {
+    username: process.env.MY_BANK_USER,
+    password: process.env.MY_BANK_PASS,
+  },
+},
+```
+
+Profiles with any `undefined` credential are automatically skipped at startup, so it is safe to define the profile before the secrets exist.
+
+### Step E — Update the deploy command
+
+Add the new secrets to the `--set-secrets` flag in the `gcloud run deploy` command (Step 5 above), then redeploy:
+
+```bash
+# Add to --set-secrets: MY_BANK_USER=MY_BANK_USER:latest,MY_BANK_PASS=MY_BANK_PASS:latest
+gcloud run deploy budget-bot --source . --region=$REGION ...
+```
+
+### Step F — Test
+
+Trigger a manual scrape and check logs:
+
+```bash
+curl -X POST $SERVICE_URL/scrape
+gcloud logging read "resource.labels.service_name=budget-bot" --limit=30 --freshness=2m
+```
+
+### OTP / two-factor sources
+
+If the new bank requires OTP, no extra code is needed. The existing OTP watcher (`hapoalim-otp.mjs`) detects any OTP page automatically, sends a Telegram prompt, and waits for `/otp [code]`. Add the new company to the manual-trigger flow by telling the user to use the `/hapoalim` command (or extend `index.mjs` with a dedicated command for the new bank).
+
+---
 
 ## CI/CD (optional)
 

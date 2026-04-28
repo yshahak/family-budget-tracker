@@ -40,7 +40,7 @@ Cloud Run: budget-bot (Node.js 22, always-on CPU)
 | Max (Leumi Card) | `max`      | |
 | Bank Hapoalim | `hapoalim`   | Requires OTP on first login; session persisted in Firestore |
 
-Additional scrapers from [israeli-bank-scrapers](https://github.com/eshaham/israeli-bank-scrapers) can be added by defining a new profile in `src/config.mjs`.
+Additional scrapers from [israeli-bank-scrapers](https://github.com/eshaham/israeli-bank-scrapers) can be added — see [Adding a new source](#adding-a-new-source) below.
 
 ## Tech stack
 
@@ -78,7 +78,7 @@ cp .env.example .env
 node src/index.mjs              # starts bot in polling mode on port 8080
 curl -X POST localhost:8080/scrape          # trigger card scrape
 curl -X POST localhost:8080/scrape-hapoalim # trigger Hapoalim scrape (OTP required first time)
-node src/scrape-hapoalim-local.mjs          # interactive OTP login, saves session to Firestore
+node src/scrape-hapoalim-local.mjs          # run Hapoalim scrape locally (OTP via Telegram /otp)
 ```
 
 ## Project layout
@@ -96,8 +96,7 @@ src/
   status.mjs                  /status command: summary + drill-down + month navigation
   budget-ui.mjs               /budget command message builder
   categories.mjs              ⚙️  Category list and emoji map — customize this
-  hapoalim-session.mjs        Cookie save/load for Hapoalim session
-  hapoalim-otp.mjs            Firestore-based OTP relay (Cloud Run ↔ local script)
+  hapoalim-otp.mjs            Firestore-based OTP relay (Cloud Run ↔ Telegram /otp command)
   firestore.mjs               Firestore client singleton
   seed-rules.mjs              ⚙️  One-time: populate merchant→category rules — customize and run once
   backfill.mjs                Utility: fetch historical transactions for a past month
@@ -109,3 +108,56 @@ israeli-bank-scrapers/        Cloned library (built during Docker image build)
 ```
 
 Files marked ⚙️ are the ones you need to customize for your own household before deploying.
+
+## Adding a new source
+
+The bot supports any bank or credit card that [israeli-bank-scrapers](https://github.com/eshaham/israeli-bank-scrapers/blob/master/src/definitions.ts) supports. Adding one takes three steps:
+
+### 1. Find the scraper ID
+
+Check the `CompanyTypes` enum in the library:
+```
+leumi, hapoalim, discount, mizrahi, max, isracard, amex, visaCal, beinleumi, ...
+```
+
+### 2. Add credentials to `.env`
+
+```bash
+# .env (local) — pick any variable names you like
+MY_BANK_USER=myusername
+MY_BANK_PASS=mypassword
+```
+
+For Cloud Run, add them to Secret Manager and the `--set-secrets` flag in your deploy command:
+```bash
+echo -n "myusername" | gcloud secrets create MY_BANK_USER --data-file=-
+echo -n "mypassword" | gcloud secrets create MY_BANK_PASS --data-file=-
+```
+
+### 3. Add a profile in `src/config.mjs`
+
+```js
+{
+  name: 'my-bank',              // internal key — stored in Firestore, never change after first run
+  displayName: 'שם בעברית',    // shown in Telegram messages
+  company: 'leumi',             // CompanyTypes key from israeli-bank-scrapers
+  credentials: {
+    username: process.env.MY_BANK_USER,
+    password: process.env.MY_BANK_PASS,
+  },
+},
+```
+
+Profiles with any `undefined` credential field are automatically skipped at startup, so it's safe to define a profile before the secrets are added.
+
+### OTP / two-factor banks
+
+If the new scraper requires OTP (like Hapoalim), the existing `hapoalim-otp.mjs` watcher already handles any bank that shows an OTP page — it detects the page automatically, sends a Telegram prompt, and waits for `/otp [code]`. No additional code is needed.
+
+### After adding
+
+Redeploy and trigger a manual scrape to verify:
+```bash
+gcloud run deploy budget-bot --source . --region=europe-west1
+curl -X POST $SERVICE_URL/scrape
+```
