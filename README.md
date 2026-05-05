@@ -66,6 +66,42 @@ Categories are the core of how the system works — every transaction must belon
 
 Budget amounts can also be overridden at runtime via the `/budget` Telegram command without touching the code — those overrides are stored in Firestore and take precedence over the code defaults.
 
+## Security & Privacy
+
+### What access does this require?
+
+The bot logs into your bank accounts using the same credentials you use in a browser. It uses [israeli-bank-scrapers](https://github.com/eshaham/israeli-bank-scrapers), a well-known open-source library that automates a real browser session — no unofficial APIs, no screen scraping tricks. It reads transaction history only; it cannot initiate transfers or modify anything.
+
+Your credentials never leave your control: in the GCP setup they live in Secret Manager (encrypted at rest, accessible only to your Cloud Run service); in the local setup they stay in a `.env` file on your machine.
+
+### What does GCP store?
+
+If you use the Google Cloud deployment:
+- **Firestore** stores your transactions, categorization rules, and budget amounts — in your own GCP project, not shared with anyone
+- **Secret Manager** stores your bank credentials and Telegram token — encrypted, IAM-gated
+- **Cloud Run logs** may contain transaction descriptions (merchant names, amounts) — be aware if you share GCP project access with others
+
+### Can I run this without any cloud?
+
+Yes. GCP is used for two things: **storage** (Firestore) and **hosting** (Cloud Run). Both are replaceable:
+
+- **Storage**: Firestore can be swapped for a local SQLite database or even a JSON file with straightforward changes to `src/firestore.mjs` and the functions that call it
+- **Hosting**: the bot runs fine as a local Node.js process (`node src/index.mjs`) — no deployment needed
+- **Credentials**: without Secret Manager, credentials live in a local `.env` file that never leaves your machine
+
+A fully local setup means: your credentials stay on your computer, your transactions stay on your computer, and nothing touches a third-party server except the bank websites and Telegram.
+
+### What are the real risks?
+
+- If your GCP project is compromised, an attacker gets your bank credentials
+- If your local machine is compromised, same applies to the `.env` file
+- The Telegram bot token gives full control of the bot — rotate it immediately if exposed (as you would with any API key)
+- This project is self-hosted and community-maintained — review the code before trusting it with your credentials
+
+**Bottom line**: if the idea of your bank credentials existing anywhere outside your own computer makes you uncomfortable, run it locally with a `.env` file and swap Firestore for local storage. The code is straightforward enough to make that change in an afternoon.
+
+---
+
 ## Deployment options
 
 ### Option A — Google Cloud Run (recommended)
