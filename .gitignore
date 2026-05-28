@@ -1,5 +1,6 @@
 node_modules/
 .env
+PERSONAL.md
 *.png
 *.jpg
 !docs/*.jpg
