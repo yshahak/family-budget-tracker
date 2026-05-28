@@ -8,6 +8,13 @@ function esc(text) {
   return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+function statusDot(pct) {
+  if (pct >= 115) return '🔴';
+  if (pct >= 100) return '🟠';
+  if (pct >= 80)  return '🟡';
+  return '🟢';
+}
+
 function bar(spent, budget) {
   const pct = Math.round((spent / budget) * 100);
   const filled = Math.min(Math.round(pct / 10), 10);
@@ -24,23 +31,23 @@ export function currentMonth() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function monthLabel(month) {
+export function monthLabel(month) {
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleString('he-IL', { month: 'long', year: 'numeric' });
 }
 
-function monthShortLabel(month) {
+export function monthShortLabel(month) {
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleString('he-IL', { month: 'long' });
 }
 
-function prevMonth(month) {
+export function prevMonth(month) {
   const [y, m] = month.split('-').map(Number);
   const d = new Date(y, m - 2, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
-function nextMonth(month) {
+export function nextMonth(month) {
   const [y, m] = month.split('-').map(Number);
   const d = new Date(y, m, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -62,16 +69,17 @@ export async function buildSummaryMessage(month = null) {
   const lines = [
     `📊 <b>סטטוס תקציב — ${esc(monthLabel(m))}</b>`,
     ``,
-    `${totalBar} <b>סה"כ</b> ₪${Math.round(totalSpent).toLocaleString('he-IL')} / ₪${totalBudget.toLocaleString('he-IL')} (${totalPct}%)`,
-    `${sign} נותר: ₪${Math.abs(Math.round(totalLeft)).toLocaleString('he-IL')}${totalLeft < 0 ? ' חריגה!' : ''}`,
-    ``,
+    `${sign} <b>סה"כ</b>  ₪${Math.round(totalSpent).toLocaleString('he-IL')} / ₪${totalBudget.toLocaleString('he-IL')}  <b>(${totalPct}%)</b>`,
   ];
 
-  for (const b of buckets) {
-    const { barStr, pct } = bar(b.spent, b.amount);
+  for (let i = 0; i < buckets.length; i++) {
+    const b = buckets[i];
+    const { pct } = bar(b.spent, b.amount);
+    const dot = statusDot(pct);
     const spentFmt = Math.round(b.spent).toLocaleString('he-IL');
     const budgetFmt = b.amount.toLocaleString('he-IL');
-    lines.push(`${barStr} <b>${esc(b.name)}</b> ₪${spentFmt} / ₪${budgetFmt} (${pct}%)`);
+    lines.push(`${dot} <b>${esc(b.name)}</b>  ₪${spentFmt} / ₪${budgetFmt}  (${pct}%)`);
+    if (i === 4 || i === 9) lines.push('');
   }
 
   return lines.join('\n');
@@ -100,6 +108,7 @@ export function buildSummaryKeyboard(month = null) {
       }))
     );
   }
+  rows.push([{ text: '📊 גרף', callback_data: `status_chart|${m}` }]);
   return { inline_keyboard: rows };
 }
 
@@ -146,6 +155,14 @@ export async function buildBucketMessage(bucketName, month = null) {
 export function buildBucketKeyboard(bucketName, txns = [], month = null) {
   const m = month ?? currentMonth();
   const rows = [];
+
+  const prev = prevMonth(m);
+  const next = nextMonth(m);
+  const navRow = [{ text: `← ${monthShortLabel(prev)}`, callback_data: `status_bucket|${bucketName}|${prev}` }];
+  if (m !== currentMonth()) {
+    navRow.push({ text: `${monthShortLabel(next)} →`, callback_data: `status_bucket|${bucketName}|${next}` });
+  }
+  rows.push(navRow);
 
   for (const t of txns.slice(0, MAX_TXN_LINES)) {
     const date = t.date.slice(5, 10).replace('-', '/');

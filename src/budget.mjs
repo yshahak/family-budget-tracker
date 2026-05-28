@@ -13,7 +13,7 @@ const DEFAULT_BUDGET_BUCKETS = [
   { name: 'חינוך',       amount: 1000, categories: ['חינוך', 'ילדים'] },
   { name: 'חוגים',       amount: 500,  categories: ['חוגים'] },
   { name: 'חופשות',      amount: 500,  categories: ['נסיעות'] },
-  { name: 'חסכנות',      amount: 500,  categories: ['חסכנות'] },
+  { name: 'חסכונות',      amount: 500,  categories: ['חסכונות'] },
   { name: 'תרומות',      amount: 200,  categories: ['תרומות'] },
   { name: 'בידור',       amount: 200,  categories: ['בידור'] },
 ];

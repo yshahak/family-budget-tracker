@@ -128,8 +128,17 @@ Three Cloud Scheduler jobs (Asia/Jerusalem timezone):
 
 - `node src/backfill.mjs --month=2026-03 [--companies=isracard,max,hapoalim]` — fetch historical transactions for a past month
 - `node src/recategorize-paybox.mjs [--dry-run]` — bulk-recategorize transactions by description pattern
-- `node src/seed-rules.mjs` — seed initial merchant rules into Firestore (run once, safe to re-run)
+- `node src/seed-rules.mjs` — seed initial merchant rules into Firestore (run once, safe to re-run). Also seeds `EXTRA_SEED_RULES` from `src/local-config.mjs`.
 - `node src/cleanup-owner-rename.mjs [--dry-run]` — delete transactions by owner value (one-time cleanup)
+- `node src/local-dump.mjs` — dump Firestore collections to `local-data/*.json` for offline analysis (gitignored)
+- `node src/local-analyze.mjs [--months=4]` — monthly spend vs budget table from local dump
+
+## Personal config
+
+`src/local-config.mjs` is gitignored and overrides defaults for personal use. Copy from `src/local-config.example.mjs` on first setup. Controls:
+- `BUDGET_BUCKETS` — household bucket amounts (ILS)
+- `CATEGORIES` / `CATEGORY_EMOJI` — override category list and emoji map
+- `EXTRA_SEED_RULES` — personal merchant patterns merged into `seed-rules.mjs`
 
 ## Hapoalim patch (required after rebuilding library)
 

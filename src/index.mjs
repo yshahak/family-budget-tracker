@@ -7,9 +7,12 @@ import { saveRule } from './categorizer.mjs';
 import { getDb } from './firestore.mjs';
 import { CATEGORIES, CATEGORY_EMOJI } from './categories.mjs';
 import { getMonthlyBudgetInfo } from './budget.mjs';
-import { buildSummaryMessage, buildSummaryKeyboard, buildBucketMessage, buildBucketKeyboard, currentMonth } from './status.mjs';
+import { buildSummaryMessage, buildSummaryKeyboard, buildBucketMessage, buildBucketKeyboard, currentMonth, monthLabel } from './status.mjs';
+import { renderStatusImage } from './status-image.mjs';
+import { getAllBucketsStatus } from './budget.mjs';
 import { buildBudgetMessage, buildBudgetKeyboard } from './budget-ui.mjs';
 import { updateBucketAmount } from './budget.mjs';
+
 
 const app = express();
 app.use(express.json());
@@ -50,10 +53,7 @@ app.post('/daily-status', async (req, res) => {
   try {
     const month = currentMonth();
     const text = await buildSummaryMessage(month);
-    await getBot().sendMessage(TELEGRAM_CHAT_ID, text, {
-      parse_mode: 'HTML',
-      reply_markup: buildSummaryKeyboard(month),
-    });
+    await getBot().sendMessage(TELEGRAM_CHAT_ID, text, { parse_mode: 'HTML', reply_markup: buildSummaryKeyboard(month) });
   } catch (e) {
     console.error('[daily-status] error:', e.message);
   }
@@ -111,10 +111,7 @@ getBot().onText(/\/status/, async (msg) => {
   try {
     const month = currentMonth();
     const text = await buildSummaryMessage(month);
-    await getBot().sendMessage(msg.chat.id, text, {
-      parse_mode: 'HTML',
-      reply_markup: buildSummaryKeyboard(month),
-    });
+    await getBot().sendMessage(msg.chat.id, text, { parse_mode: 'HTML', reply_markup: buildSummaryKeyboard(month) });
   } catch (e) {
     console.error('[status] error:', e.message);
   }
@@ -270,6 +267,20 @@ getBot().on('callback_query', async (query) => {
       });
     } catch (e) {
       if (!e.message?.includes('message is not modified')) console.error('[status_back] error:', e.message);
+    }
+    return;
+  }
+
+  // Chart: send status image as a document (full resolution)
+  if (parts[0] === 'status_chart' && parts[1]) {
+    try {
+      await getBot().answerCallbackQuery(query.id, { text: 'מייצר גרף...' });
+      const month = parts[1];
+      const buckets = await getAllBucketsStatus(month);
+      const image = await renderStatusImage(buckets, monthLabel(month));
+      await getBot().sendDocument(query.message.chat.id, image, {}, { filename: `budget-${month}.png`, contentType: 'image/png' });
+    } catch (e) {
+      console.error('[status_chart] error:', e.message);
     }
     return;
   }

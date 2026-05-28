@@ -1,6 +1,7 @@
 node_modules/
 .env
 src/local-config.mjs
+local-data/
 PERSONAL.md
 *.png
 *.jpg
