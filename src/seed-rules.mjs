@@ -4,7 +4,8 @@
  */
 import '../src/config.mjs';
 import { getDb } from './firestore.mjs';
-import { EXTRA_SEED_RULES } from './local-config.mjs';
+let EXTRA_SEED_RULES = [];
+try { ({ EXTRA_SEED_RULES } = await import('./local-config.mjs')); } catch {}
 
 const RULES = [
   // ── Groceries ──────────────────────────────────────────────────────

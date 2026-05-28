@@ -135,7 +135,7 @@ Three Cloud Scheduler jobs (Asia/Jerusalem timezone):
 
 ## Personal config
 
-`src/local-config.mjs` is gitignored and overrides defaults for personal use. Copy from `src/local-config.example.mjs` on first setup. Controls:
+`src/local-config.mjs` is gitignored and optional — if absent, built-in defaults are used. Copy from `src/local-config.example.mjs` to customize. Controls:
 - `BUDGET_BUCKETS` — household bucket amounts (ILS)
 - `CATEGORIES` / `CATEGORY_EMOJI` — override category list and emoji map
 - `EXTRA_SEED_RULES` — personal merchant patterns merged into `seed-rules.mjs`

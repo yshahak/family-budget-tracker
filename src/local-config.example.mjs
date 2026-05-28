@@ -1,6 +1,7 @@
 /**
- * Copy this file to local-config.mjs and customize for your household.
+ * Optionally copy this file to local-config.mjs and customize for your household.
  * local-config.mjs is gitignored — safe to put personal amounts and patterns here.
+ * If the file doesn't exist, all built-in defaults are used automatically.
  *
  * null → use the built-in defaults from categories.mjs / budget.mjs
  */

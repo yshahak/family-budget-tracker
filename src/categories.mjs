@@ -1,4 +1,5 @@
-import { CATEGORIES as LOCAL_CATEGORIES, CATEGORY_EMOJI as LOCAL_EMOJI } from './local-config.mjs';
+let LOCAL_CATEGORIES = null, LOCAL_EMOJI = null;
+try { ({ CATEGORIES: LOCAL_CATEGORIES, CATEGORY_EMOJI: LOCAL_EMOJI } = await import('./local-config.mjs')); } catch {}
 
 const DEFAULT_CATEGORIES = [
   'קניות לבית',

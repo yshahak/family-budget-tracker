@@ -1,5 +1,6 @@
 import { getDb } from './firestore.mjs';
-import { BUDGET_BUCKETS as LOCAL_BUCKETS } from './local-config.mjs';
+let LOCAL_BUCKETS = null;
+try { ({ BUDGET_BUCKETS: LOCAL_BUCKETS } = await import('./local-config.mjs')); } catch {}
 
 const DEFAULT_BUDGET_BUCKETS = [
   { name: 'אוכל',        amount: 3000, categories: ['קניות לבית', 'בית', 'מכולת'] },
