@@ -1,23 +1,25 @@
 import { getDb } from './firestore.mjs';
+import { BUDGET_BUCKETS as LOCAL_BUCKETS } from './local-config.mjs';
+
+const DEFAULT_BUDGET_BUCKETS = [
+  { name: 'אוכל',        amount: 3000, categories: ['קניות לבית', 'בית', 'מכולת'] },
+  { name: 'מסעדות',      amount: 500,  categories: ['מסעדות'] },
+  { name: 'תחבורה',      amount: 1500, categories: ['תחבורה'] },
+  { name: 'שונות',       amount: 1000, categories: ['אחר', 'קניות אונליין'] },
+  { name: 'פייבוקס/ביט', amount: 500,  categories: ['פייבוקס/ביט'] },
+  { name: 'חשבונות',     amount: 1000, categories: ['חשבונות'] },
+  { name: 'ביגוד',       amount: 500,  categories: ['ביגוד'] },
+  { name: 'בריאות',      amount: 500,  categories: ['בריאות'] },
+  { name: 'חינוך',       amount: 1000, categories: ['חינוך', 'ילדים'] },
+  { name: 'חוגים',       amount: 500,  categories: ['חוגים'] },
+  { name: 'חופשות',      amount: 500,  categories: ['נסיעות'] },
+  { name: 'חסכנות',      amount: 500,  categories: ['חסכנות'] },
+  { name: 'תרומות',      amount: 200,  categories: ['תרומות'] },
+  { name: 'בידור',       amount: 200,  categories: ['בידור'] },
+];
 
 // Monthly budget buckets — amounts in ILS
-export const BUDGET_BUCKETS = [
-  { name: 'אוכל',     amount: 7000, categories: ['קניות לבית', 'בית', 'מכולת'] },
-  { name: 'מסעדות',   amount: 500,  categories: ['מסעדות'] },
-  { name: 'הלוואות',  amount: 7087, categories: ['הלוואות'] },
-  { name: 'תחבורה',   amount: 3546, categories: ['תחבורה'] },
-  { name: 'שונות',    amount: 3000, categories: ['אחר', 'קניות אונליין'] },
-  { name: 'פייבוקס/ביט', amount: 500, categories: ['פייבוקס/ביט'] },
-  { name: 'חשבונות',  amount: 2254, categories: ['חשבונות'] },
-  { name: 'ביגוד',    amount: 1500, categories: ['ביגוד'] },
-  { name: 'בריאות',   amount: 1003, categories: ['בריאות'] },
-  { name: 'חינוך',    amount: 3260, categories: ['חינוך', 'ילדים'] },
-  { name: 'חוגים',    amount: 545,  categories: ['חוגים'] },
-  { name: 'חופשות',   amount: 700,  categories: ['נסיעות'] },
-  { name: 'חסכנות',   amount: 1000, categories: ['חסכנות'] },
-  { name: 'תרומות',   amount: 300,  categories: ['תרומות'] },
-  { name: 'בידור',    amount: 76,   categories: ['בידור'] },
-];
+export const BUDGET_BUCKETS = LOCAL_BUCKETS ?? DEFAULT_BUDGET_BUCKETS;
 
 export function getBucket(category) {
   return BUDGET_BUCKETS.find(b => b.categories.includes(category)) ?? null;

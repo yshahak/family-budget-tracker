@@ -4,6 +4,7 @@
  */
 import '../src/config.mjs';
 import { getDb } from './firestore.mjs';
+import { EXTRA_SEED_RULES } from './local-config.mjs';
 
 const RULES = [
   // ── Groceries ──────────────────────────────────────────────────────
@@ -150,22 +151,16 @@ const RULES = [
   { pattern: 'google cloud',      category: 'חשבונות' },
   { pattern: 'דמי כרטיס',         category: 'חשבונות' },
   { pattern: 'ביטוח חובה',        category: 'תחבורה' },
-  { pattern: 'ביטוח רכב',        category: 'תחבורה' },
-  { pattern: 'ביטוח סקודה',      category: 'תחבורה' },
-  { pattern: 'ביטוח טויוטה',     category: 'תחבורה' },
-  { pattern: 'ביטוח בריאות',     category: 'בריאות' },
-  { pattern: 'ביטוח חיים',       category: 'חשבונות' },
-  { pattern: 'ביטוח מבנה',       category: 'קניות לבית' },
-  { pattern: 'ביטוח סיעוד',      category: 'בריאות' },
-  { pattern: 'ליברה',            category: 'תחבורה' },
-  { pattern: 'איתוראן',          category: 'תחבורה' },
-  { pattern: 'כביש 6',           category: 'תחבורה' },
-  { pattern: 'פנגו',             category: 'תחבורה' },
-  { pattern: 'הפניקס חיים',      category: 'חשבונות' },
-  { pattern: 'הפניקס',           category: 'חשבונות' },
-  { pattern: 'פעמונים',          category: 'אחר' },
-  { pattern: 'בהצדעה',           category: 'אחר' },
-  { pattern: 'קרן הוכשטיין',     category: 'אחר' },
+  { pattern: 'ביטוח רכב',         category: 'תחבורה' },
+  { pattern: 'ביטוח בריאות',      category: 'בריאות' },
+  { pattern: 'ביטוח חיים',        category: 'חשבונות' },
+  { pattern: 'ביטוח מבנה',        category: 'קניות לבית' },
+  { pattern: 'ביטוח סיעוד',       category: 'בריאות' },
+  { pattern: 'הפניקס',            category: 'חשבונות' },
+  { pattern: 'ליברה',             category: 'תחבורה' },
+  { pattern: 'איתוראן',           category: 'תחבורה' },
+  { pattern: 'כביש 6',            category: 'תחבורה' },
+  { pattern: 'פנגו',              category: 'תחבורה' },
   { pattern: 'insurance',         category: 'חשבונות' },
 
   // ── Online Shopping ────────────────────────────────────────────────
@@ -243,7 +238,7 @@ async function main() {
   const col = db.collection('budget_rules');
   let count = 0;
 
-  for (const rule of RULES) {
+  for (const rule of [...RULES, ...(EXTRA_SEED_RULES ?? [])]) {
     const docId = Buffer.from(rule.pattern.toLowerCase().trim()).toString('base64url').slice(0, 64);
     await col.doc(docId).set(
       { pattern: rule.pattern.toLowerCase().trim(), category: rule.category, createdBy: 'seed', updatedAt: new Date() },

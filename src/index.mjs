@@ -43,6 +43,22 @@ app.post('/scrape', (req, res) => {
   runPipeline({ companies: ['isracard', 'max'] }).catch(e => console.error('[pipeline] unhandled error:', e));
 });
 
+// Daily status summary — triggered by Cloud Scheduler once a day
+app.post('/daily-status', async (req, res) => {
+  console.log('[server] /daily-status triggered');
+  res.json({ ok: true });
+  try {
+    const month = currentMonth();
+    const text = await buildSummaryMessage(month);
+    await getBot().sendMessage(TELEGRAM_CHAT_ID, text, {
+      parse_mode: 'HTML',
+      reply_markup: buildSummaryKeyboard(month),
+    });
+  } catch (e) {
+    console.error('[daily-status] error:', e.message);
+  }
+});
+
 // Hapoalim HTTP endpoint (kept for manual curl triggering)
 app.post('/scrape-hapoalim', (req, res) => {
   console.log('[server] /scrape-hapoalim triggered via HTTP');

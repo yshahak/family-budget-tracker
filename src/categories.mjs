@@ -1,4 +1,6 @@
-export const CATEGORIES = [
+import { CATEGORIES as LOCAL_CATEGORIES, CATEGORY_EMOJI as LOCAL_EMOJI } from './local-config.mjs';
+
+const DEFAULT_CATEGORIES = [
   'קניות לבית',
   'מסעדות',
   'תחבורה',
@@ -17,7 +19,9 @@ export const CATEGORIES = [
   'אחר',
 ];
 
-export const CATEGORY_EMOJI = {
+export const CATEGORIES = LOCAL_CATEGORIES ?? DEFAULT_CATEGORIES;
+
+const DEFAULT_CATEGORY_EMOJI = {
   'קניות לבית':   '🛒',
   'מסעדות':       '🍽️',
   'תחבורה':       '🚗',
@@ -37,3 +41,5 @@ export const CATEGORY_EMOJI = {
   'חסכנות':       '💰',
   'אחר':          '📦',
 };
+
+export const CATEGORY_EMOJI = LOCAL_EMOJI ?? DEFAULT_CATEGORY_EMOJI;

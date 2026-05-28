@@ -16,7 +16,8 @@ export async function runPipeline({ companies, startDate: startDateOverride } = 
   let totalNew = 0;
 
   for (const { owner, accountNumber, txns } of accounts) {
-    const newTxns = await filterNew(txns, accountNumber, owner);
+    const newTxns = (await filterNew(txns, accountNumber, owner))
+      .filter(t => t.chargedAmount !== 0);
     console.log(`[pipeline] ${owner}/${accountNumber}: ${newTxns.length} new of ${txns.length}`);
 
     for (const txn of newTxns) {

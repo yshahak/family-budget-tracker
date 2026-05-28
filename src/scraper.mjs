@@ -20,6 +20,7 @@ const HAPOALIM_SKIP_PATTERNS = [
   /^תיקון מס/,      // tax corrections
   /^רבית$/,         // interest
   /קצבת ילדים/,     // child allowance (income)
+  /חיוב מאשראי/,    // credit card bill payment — already captured via card scrapers
 ];
 
 function shouldSkip(txn) {
