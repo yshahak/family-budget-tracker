@@ -26,6 +26,8 @@ export function getBucket(category) {
   return BUDGET_BUCKETS.find(b => b.categories.includes(category)) ?? null;
 }
 
+const bucketDocId = name => name.replace(/\//g, '_');
+
 // Returns amount overrides from Firestore, falling back to BUDGET_BUCKETS defaults
 export async function getAmountOverrides() {
   const snap = await getDb().collection('budget_amounts').get();
@@ -35,12 +37,12 @@ export async function getAmountOverrides() {
 }
 
 export async function updateBucketAmount(bucketName, amount) {
-  await getDb().collection('budget_amounts').doc(bucketName).set({ amount });
+  await getDb().collection('budget_amounts').doc(bucketDocId(bucketName)).set({ amount });
 }
 
 async function bucketsWithAmounts() {
   const overrides = await getAmountOverrides();
-  return BUDGET_BUCKETS.map(b => ({ ...b, amount: overrides[b.name] ?? b.amount }));
+  return BUDGET_BUCKETS.map(b => ({ ...b, amount: overrides[bucketDocId(b.name)] ?? overrides[b.name] ?? b.amount }));
 }
 
 // Returns { start, end } ISO date strings for the given month ('YYYY-MM') or current month
