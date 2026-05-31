@@ -52,10 +52,11 @@ function buildHtml(buckets, label) {
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="he"><head><meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 * { margin:0; padding:0; box-sizing:border-box }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  font-family: 'Noto Sans Hebrew', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
   background: #eef1f5;
   width: 520px;
   padding: 10px;
@@ -130,6 +131,10 @@ export async function renderStatusImage(buckets, label) {
     const page = await browser.newPage();
     await page.setViewport({ width: 540, height: 900 });
     await page.setContent(html, { waitUntil: 'domcontentloaded' });
+    await Promise.race([
+      page.evaluate(() => document.fonts.ready),
+      new Promise(r => setTimeout(r, 4000)),
+    ]);
     const el = await page.$('#card');
     return await el.screenshot({ type: 'png' });
   } finally {
