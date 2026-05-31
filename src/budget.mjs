@@ -5,6 +5,7 @@ try { ({ BUDGET_BUCKETS: LOCAL_BUCKETS } = await import('./local-config.mjs')); 
 const DEFAULT_BUDGET_BUCKETS = [
   { name: 'אוכל',        amount: 3000, categories: ['קניות לבית', 'בית', 'מכולת'] },
   { name: 'מסעדות',      amount: 500,  categories: ['מסעדות'] },
+  { name: 'הלוואות',     amount: 1000, categories: ['הלוואות'] },
   { name: 'תחבורה',      amount: 1500, categories: ['תחבורה'] },
   { name: 'שונות',       amount: 1000, categories: ['אחר', 'קניות אונליין'] },
   { name: 'פייבוקס/ביט', amount: 500,  categories: ['פייבוקס/ביט'] },
