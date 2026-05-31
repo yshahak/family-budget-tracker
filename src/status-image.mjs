@@ -33,7 +33,7 @@ function buildHtml(buckets, label) {
     const budget   = b.amount.toLocaleString('he-IL');
     return `
     <div class="row">
-      <div class="name">${bucketEmoji(b)} ${b.name}</div>
+      <div class="name">${b.name}</div>
       <div class="bar-wrap">
         <div class="bar-track">
           <div class="bar-fill" style="width:${barW}%;background:${color}"></div>
