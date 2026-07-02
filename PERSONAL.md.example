@@ -1,0 +1,25 @@
+# Personal Notes — <your name>
+
+This file is gitignored. Use it for personal reminders, questions to investigate, or notes for Claude.
+
+## My setup
+
+- Owner 1: <name> — <banks/cards>
+- Owner 2: <name> — <banks/cards>
+- Telegram group: <group name>
+- GCP account: <you>@gmail.com
+- GCP project: <your-project-id>
+- Cloud Run region: europe-west1
+- Local-dev service account: budget-bot-local-dev@<your-project-id>.iam.gserviceaccount.com (roles/datastore.user)
+- GitHub username: <your-github-username>
+
+## Things to investigate / backlog
+
+<!-- Add notes here, e.g.:
+- [ ] Check why some category keeps going over budget
+- [ ] Consider adding another bank
+-->
+
+## Notes for Claude
+
+<!-- Anything you want Claude to know at the start of a session -->

@@ -4,15 +4,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## GCP / GitHub accounts — always check first
 
-Before any `gcloud`, Firestore, or Cloud Run command:
+This repo is open source; your GCP project ID, account email, and GitHub username are personal and belong in the gitignored **`PERSONAL.md`** (copy from `PERSONAL.md.example` if it doesn't exist yet), not in this file. Read your account/project from there before running any `gcloud`, Firestore, or Cloud Run command:
 ```bash
-gcloud config set account yshahak@gmail.com
-gcloud config set project siud-payslip-bot
+gcloud config set account <your account, from PERSONAL.md>
+gcloud config set project <your project, from PERSONAL.md>
+```
+
+Local Node scripts (anything using `getDb()`/Firestore) authenticate via `GOOGLE_APPLICATION_CREDENTIALS` in `.env`, pointing at `local-dev-sa-key.json` (gitignored, key for the `budget-bot-local-dev` service account, `roles/datastore.user` only). This avoids `gcloud auth application-default login` silently being logged in as the wrong Google account. If the key file is missing, recreate it:
+```bash
+gcloud iam service-accounts keys create ./local-dev-sa-key.json \
+  --iam-account=budget-bot-local-dev@<your project>.iam.gserviceaccount.com
 ```
 
 Before any `git push`:
 ```bash
-gh auth switch --user yshahak
+gh auth switch --user <your GitHub username, from PERSONAL.md>
 ```
 
 The default active account is `yaakov@lightricks.com` (work) which has no access to this project.
@@ -46,10 +52,10 @@ curl "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/setWebhook?url=${WEBHOOK
 The bot is an Express server running in Cloud Run. Key modules:
 
 - **`config.mjs`** — loads all env vars, defines `SCRAPE_PROFILES` (one entry per bank/card). Profiles with missing credentials are automatically excluded. `DISPLAY_NAME` maps profile name → human-readable label for Telegram.
-- **`scraper.mjs`** — launches Puppeteer, runs `createScraper()` per profile, filters Hapoalim transactions via `HAPOALIM_SKIP_PATTERNS`. Also filters `chargedAmount === 0` (pre-auth charges).
+- **`scraper.mjs`** — launches Puppeteer, runs `createScraper()` per profile, filters Hapoalim transactions via `HAPOALIM_SKIP_PATTERNS`. Also filters `chargedAmount === 0` (pre-auth charges). `scrapeAll()` accepts `delayMs` option to pause between profiles (avoids Isracard "Block Automation" 429 when running multiple profiles back-to-back).
 - **`pipeline.mjs`** — orchestrates scrape → dedup → categorize → notify. Accepts `{ companies, startDate }` overrides for backfill. Skips zero-amount transactions.
 - **`categorizer.mjs`** — Firestore rules (5min cache) → Gemini 2.5 Flash → null (manual). `saveRule(description, category)` saves full description as pattern — patterns are `.trim()`ed so never use trailing spaces in patterns.
-- **`dedup.mjs`** — SHA-256 dedup hash: `sha256(date|identifier|chargedAmount|accountNumber|owner)`. `updateCategory()`, `updateIgnored()`. Owner is part of hash — never change `PROFILE1_NAME`/`PROFILE2_NAME` after first run.
+- **`dedup.mjs`** — SHA-256 dedup hash: `sha256(date|identifier|chargedAmount|accountNumber|owner)`. `updateCategory()`, `updateIgnored()`. Owner is part of hash — never change `PROFILE1_NAME`/`PROFILE2_NAME` after first run. Persists `installments: { number, total }` from scraper output (null if not an installment transaction).
 - **`notifier.mjs`** — Telegram message formatting. Exports `categoryKeyboard(txnId, category, ignored, backContext)` and `buildText()`. `backContext = { bucketName, month }` adds a back button to the keyboard.
 - **`status.mjs`** — `/status` command: monthly summary + per-bucket drill-down with clickable transaction buttons + month navigation. `buildBucketMessage()` returns `{ text, txns }`.
 - **`hapoalim-otp.mjs`** — watches browser pages for OTP prompt, relays code from Telegram via Firestore `otp_cache/hapoalim`. Triggered by `/hapoalim` Telegram command.
@@ -112,21 +118,25 @@ See `.env.example` for the full list. The most important:
 
 Deploy from inside the `family-budget-tracker/` directory:
 ```bash
-gcloud config set account yshahak@gmail.com
-gcloud config set project siud-payslip-bot
+gcloud config set account <your account, from PERSONAL.md>
+gcloud config set project <your project, from PERSONAL.md>
 gcloud run deploy budget-bot --source . --region=europe-west1 --quiet
 ```
 
-Cloud Run: `siud-payslip-bot` project, `europe-west1`, 2Gi memory, CPU-always-allocated, max 1 instance, timeout 900s.
+Cloud Run: `europe-west1`, 2Gi memory, CPU-always-allocated, max 1 instance, timeout 900s. Use a dedicated GCP project for this bot — don't share a project with unrelated apps, since Artifact Registry image sprawl across apps makes billing hard to attribute (see cleanup policy note below).
 
-Three Cloud Scheduler jobs (Asia/Jerusalem timezone):
-- `budget-bot-cards-weekday` — `/scrape` every 2h 10:00–20:00, Sun–Thu
-- `budget-bot-cards-friday` — `/scrape` every 2h 10:00–16:00, Fri
+Four Cloud Scheduler jobs (Asia/Jerusalem timezone):
+- `budget-bot-cards-sun-thu` — `/scrape` every 2h 10:00–20:00, Sun–Thu
+- `budget-bot-cards-fri` — `/scrape` every 2h 10:00–16:00, Fri
+- `budget-bot-hapoalim` — `/scrape-hapoalim` at 10:00, Sun–Thu
 - `budget-bot-daily-status` — `/daily-status` at 21:00, Sun–Fri
+
+Artifact Registry cleanup policy is set on `cloud-run-source-deploy` (delete images older than 7 days) — always verify this exists after creating a new Cloud Run service, don't wait for a surprise bill.
 
 ## Utility scripts
 
 - `node src/backfill.mjs --month=2026-03 [--companies=isracard,max,hapoalim]` — fetch historical transactions for a past month
+- `node src/backfill-installments.mjs [--dry-run]` — backfill `installments` field onto existing Firestore docs; scrapes Isracard + Max from 2026-04-01 with 15s delay between profiles
 - `node src/recategorize-paybox.mjs [--dry-run]` — bulk-recategorize transactions by description pattern
 - `node src/seed-rules.mjs` — seed initial merchant rules into Firestore (run once, safe to re-run). Also seeds `EXTRA_SEED_RULES` from `src/local-config.mjs`.
 - `node src/cleanup-owner-rename.mjs [--dry-run]` — delete transactions by owner value (one-time cleanup)
