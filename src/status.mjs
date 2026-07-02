@@ -142,7 +142,8 @@ export async function buildBucketMessage(bucketName, month = null) {
       const amount = Math.abs(t.chargedAmount).toFixed(0);
       const ownerFull = DISPLAY_NAME[t.owner] || t.owner || '';
       const owner = ownerFull.slice(0, 1) + '׳';
-      lines.push(`${date}  ${esc(t.description.slice(0, 28))}  <b>₪${amount}</b> ${owner}`);
+      const inst = t.installments ? ` (${t.installments.number}/${t.installments.total})` : '';
+      lines.push(`${date}  ${esc(t.description.slice(0, 28))}  <b>₪${amount}</b>${inst} ${owner}`);
     }
     if (txns.length > MAX_TXN_LINES) {
       lines.push(`\n<i>... ועוד ${txns.length - MAX_TXN_LINES} עסקאות</i>`);

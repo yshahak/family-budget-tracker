@@ -17,8 +17,10 @@ export function getBot() {
 function formatAmount(txn) {
   const sign = txn.chargedAmount > 0 ? '+' : '';
   const abs = Math.abs(txn.chargedAmount).toFixed(2);
-  if (txn.originalCurrency === 'ILS') return `${sign}₪${abs}`;
-  return `${sign}${txn.originalCurrency} ${Math.abs(txn.originalAmount).toFixed(2)} (₪${abs})`;
+  const base = txn.originalCurrency === 'ILS'
+    ? `${sign}₪${abs}`
+    : `${sign}${txn.originalCurrency} ${Math.abs(txn.originalAmount).toFixed(2)} (₪${abs})`;
+  return txn.installments ? `${base} (${txn.installments.number}/${txn.installments.total})` : base;
 }
 
 export function categoryKeyboard(txnId, selectedCategory = null, ignored = false, backContext = null) {
