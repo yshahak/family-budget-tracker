@@ -47,7 +47,7 @@ async function launchBrowser() {
   return browser;
 }
 
-export async function scrapeAll(startDate, { companies } = {}) {
+export async function scrapeAll(startDate, { companies, delayMs = 0 } = {}) {
   const profiles = companies
     ? SCRAPE_PROFILES.filter(p => companies.includes(p.company))
     : SCRAPE_PROFILES;
@@ -69,6 +69,7 @@ export async function scrapeAll(startDate, { companies } = {}) {
         timeoutMs: isHapoalim ? 120000 : 60000,
         browser,
         skipCloseBrowser: true,
+        includeRawTransaction: true,
       });
 
       const otpWatcher = isHapoalim ? startOtpWatcher(browser) : null;
@@ -95,6 +96,10 @@ export async function scrapeAll(startDate, { companies } = {}) {
       }
     } catch (e) {
       console.error(`[scraper] ${profile.name} threw:`, e.message);
+    }
+    if (delayMs > 0 && profile !== profiles.at(-1)) {
+      console.log(`[scraper] waiting ${delayMs / 1000}s before next profile...`);
+      await new Promise(r => setTimeout(r, delayMs));
     }
   }
 

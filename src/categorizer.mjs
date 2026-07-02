@@ -22,13 +22,15 @@ export function invalidateRulesCache() {
   rulesCache = null;
 }
 
-export async function categorize(description) {
-  const descLower = description.toLowerCase();
+export async function categorize(description, memo) {
+  const searchText = `${description} ${memo ?? ''}`.toLowerCase();
 
-  // 1. Rule match
+  // 1. Rule match — checks description + memo, so standing orders/transfers sharing a
+  // generic description (e.g. "הוראת-קבע") can still be told apart once memo carries
+  // the actual recipient/reference detail.
   const rules = await getRules();
   for (const rule of rules) {
-    if (descLower.includes(rule.pattern.toLowerCase())) {
+    if (searchText.includes(rule.pattern.toLowerCase())) {
       return { category: rule.category, source: 'rule' };
     }
   }

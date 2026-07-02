@@ -13,6 +13,11 @@ import { getAllBucketsStatus } from './budget.mjs';
 import { buildBudgetMessage, buildBudgetKeyboard } from './budget-ui.mjs';
 import { updateBucketAmount } from './budget.mjs';
 
+// Memo (bank beneficiary/reference detail) only exists once a transaction settles, and is
+// what tells apart standing orders/transfers sharing a generic description (e.g. "הוראת-קבע").
+function ruleTextFor(txn) {
+  return txn.memo ? `${txn.description} ${txn.memo}` : txn.description;
+}
 
 const app = express();
 app.use(express.json());
@@ -317,7 +322,7 @@ getBot().on('callback_query', async (query) => {
       await getBot().answerCallbackQuery(query.id);
       const doc = await getDb().collection('budget_transactions').doc(txnId).get();
       if (!doc.exists) return;
-      const pattern = doc.data().description.toLowerCase().trim();
+      const pattern = ruleTextFor(doc.data()).toLowerCase().trim();
 
       const allSnap = await getDb().collection('budget_transactions').get();
       const batch = getDb().batch();
@@ -325,7 +330,7 @@ getBot().on('callback_query', async (query) => {
       for (const d of allSnap.docs) {
         if (d.id === txnId) continue;
         const t = d.data();
-        if ((t.description || '').toLowerCase().includes(pattern) && t.category !== category) {
+        if (ruleTextFor(t).toLowerCase().includes(pattern) && t.category !== category) {
           batch.update(d.ref, { category });
           count++;
         }
@@ -360,14 +365,14 @@ getBot().on('callback_query', async (query) => {
     const doc = await getDb().collection('budget_transactions').doc(txnId).get();
     if (!doc.exists) return;
     const txn = doc.data();
-    await saveRule(txn.description, category, 'manual');
+    await saveRule(ruleTextFor(txn), category, 'manual');
 
-    // Check for other transactions with the same description that have a different category
-    const pattern = txn.description.toLowerCase().trim();
+    // Check for other transactions with the same description+memo that have a different category
+    const pattern = ruleTextFor(txn).toLowerCase().trim();
     const allSnap = await getDb().collection('budget_transactions').get();
     const similarCount = allSnap.docs.filter(d =>
       d.id !== txnId &&
-      (d.data().description || '').toLowerCase().includes(pattern) &&
+      ruleTextFor(d.data()).toLowerCase().includes(pattern) &&
       d.data().category !== category
     ).length;
 
