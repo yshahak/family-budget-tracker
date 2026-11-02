@@ -24,5 +24,10 @@ const companies = companiesArg ? companiesArg.split(',') : undefined;
 
 console.log(`[backfill] Fetching from ${startDate.toISOString().slice(0, 10)}${companies ? ` (${companies.join(', ')})` : ' (all scrapers)'}...`);
 
-await runPipeline({ startDate, companies });
+const { totalNew, errors } = await runPipeline({ startDate, companies });
+console.log(`[backfill] Done — ${totalNew} new transactions.`);
+if (errors.length) {
+  console.error(`[backfill] Errors:\n${errors.join('\n')}`);
+  process.exit(1);
+}
 process.exit(0);

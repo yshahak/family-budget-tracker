@@ -17,7 +17,8 @@ const startDate = new Date('2026-04-02'); // +02 avoids timezone-midnight issues
 
 console.log(`[backfill-installments] startDate=${startDate.toISOString().slice(0, 10)} dryRun=${dryRun}`);
 
-const results = await scrapeAll(startDate, { companies: ['isracard', 'max'], delayMs: 15_000 });
+const { results, errors } = await scrapeAll(startDate, { companies: ['isracard', 'max'], delayMs: 15_000 });
+if (errors.length) console.error(`[backfill-installments] Errors:\n${errors.join('\n')}`);
 
 let checked = 0, updated = 0, skipped = 0;
 

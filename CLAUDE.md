@@ -55,11 +55,12 @@ The bot is an Express server running in Cloud Run. Key modules:
 - **`scraper.mjs`** — launches Puppeteer, runs `createScraper()` per profile, filters Hapoalim transactions via `HAPOALIM_SKIP_PATTERNS`. Also filters `chargedAmount === 0` (pre-auth charges). `scrapeAll()` accepts `delayMs` option to pause between profiles (avoids Isracard "Block Automation" 429 when running multiple profiles back-to-back).
 - **`pipeline.mjs`** — orchestrates scrape → dedup → categorize → notify. Accepts `{ companies, startDate }` overrides for backfill. Skips zero-amount transactions.
 - **`categorizer.mjs`** — Firestore rules (5min cache) → Gemini 2.5 Flash → null (manual). `saveRule(description, category)` saves full description as pattern — patterns are `.trim()`ed so never use trailing spaces in patterns.
-- **`dedup.mjs`** — SHA-256 dedup hash: `sha256(date|identifier|chargedAmount|accountNumber|owner)`. `updateCategory()`, `updateIgnored()`. Owner is part of hash — never change `PROFILE1_NAME`/`PROFILE2_NAME` after first run. Persists `installments: { number, total }` from scraper output (null if not an installment transaction).
+- **`dedup.mjs`** — SHA-256 dedup hash: `sha256(date|identifier|chargedAmount|accountNumber|owner[|occurrence])`. Owner is part of hash — never change `PROFILE1_NAME`/`PROFILE2_NAME` after first run. Some banks (Hapoalim standing orders) reuse the same reference number across distinct recurring payments (e.g. several kids' sub-accounts), so same-day siblings sharing date+identifier+amount are disambiguated by an `occurrence` index derived from `rawTransaction.recordNumber` (see `assignOccurrences`). Transactions without memo/identifier yet are saved with `status: 'pending'`; once memo/identifier arrive on a later scrape, `filterNewWithDb` resolves the matching pending doc to `status: 'completed'` in place rather than creating a new doc, and the pipeline re-categorizes it (unless the category was set manually). `updateCategory()`, `updateCategoryAuto()`, `updateIgnored()`. Persists `identifier`, `memo`, `installments: { number, total }` (null if not applicable) from scraper output.
 - **`notifier.mjs`** — Telegram message formatting. Exports `categoryKeyboard(txnId, category, ignored, backContext)` and `buildText()`. `backContext = { bucketName, month }` adds a back button to the keyboard.
 - **`status.mjs`** — `/status` command: monthly summary + per-bucket drill-down with clickable transaction buttons + month navigation. `buildBucketMessage()` returns `{ text, txns }`.
 - **`hapoalim-otp.mjs`** — watches browser pages for OTP prompt, relays code from Telegram via Firestore `otp_cache/hapoalim`. Triggered by `/hapoalim` Telegram command.
 - **`hapoalim-session.mjs`** — dead code (session saving doesn't work in Cloud Run). Safe to delete.
+- **`logger.mjs`** — structured JSON logging (`logger.info`/`logger.error`, stdout) plus `logger.logScrapeRun()` which writes a per-run summary (profiles, totals, errors) to Firestore for later review.
 
 ## HTTP endpoints
 
@@ -133,6 +134,8 @@ Four Cloud Scheduler jobs (Asia/Jerusalem timezone):
 
 Artifact Registry cleanup policy is set on `cloud-run-source-deploy` (delete images older than 7 days) — always verify this exists after creating a new Cloud Run service, don't wait for a surprise bill.
 
+**Only one live `budget-bot` deployment at a time.** `index.mjs` calls `getBot().setWebHook()` on every cold start. If two deployments both have active Cloud Scheduler jobs (e.g. mid-migration to a new project), each cold start re-registers the Telegram webhook to itself, so whichever service happened to start most recently silently wins — the other's inbound commands (`/status`, button taps) stop arriving with no error. When migrating, delete/pause the old project's scheduler jobs before relying on the new deployment's webhook.
+
 ## Utility scripts
 
 - `node src/backfill.mjs --month=2026-03 [--companies=isracard,max,hapoalim]` — fetch historical transactions for a past month
@@ -141,7 +144,11 @@ Artifact Registry cleanup policy is set on `cloud-run-source-deploy` (delete ima
 - `node src/seed-rules.mjs` — seed initial merchant rules into Firestore (run once, safe to re-run). Also seeds `EXTRA_SEED_RULES` from `src/local-config.mjs`.
 - `node src/cleanup-owner-rename.mjs [--dry-run]` — delete transactions by owner value (one-time cleanup)
 - `node src/local-dump.mjs` — dump Firestore collections to `local-data/*.json` for offline analysis (gitignored)
+- `node src/local-dump-rest.mjs` — same, via Firestore REST API + `gcloud auth print-access-token` (avoids ADC identity mismatches): `TOKEN=$(gcloud auth print-access-token) node src/local-dump-rest.mjs`
 - `node src/local-analyze.mjs [--months=4]` — monthly spend vs budget table from local dump
+- `node src/backfill-memo.mjs [--dry-run]` — one-time: re-scrapes Hapoalim to patch `memo` onto transactions saved before memo capture existed, and re-categorizes them where a memo-aware rule now applies
+- `node src/inspect-hapoalim-memo.mjs` — read-only diagnostic: scrapes Hapoalim and prints memo/rawTransaction for standing-order transactions, without touching Firestore
+- `node src/cleanup-pending-duplicates.mjs [--dry-run]` — deletes `status: 'pending'` docs superseded by a `status: 'completed'` doc for the same date+description+amount+account+owner group. Needed once, post-GCP-migration: stale pending placeholders from before the occurrence/pending-resolution logic existed had been copied over from the old project and were double-counting in `/status` alongside their later-arriving completed counterparts
 
 ## Personal config
 

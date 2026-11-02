@@ -48,7 +48,13 @@ app.get('/test-browser', async (_req, res) => {
 app.post('/scrape', (req, res) => {
   console.log('[server] /scrape triggered');
   res.json({ ok: true });
-  runPipeline({ companies: ['isracard', 'max'] }).catch(e => console.error('[pipeline] unhandled error:', e));
+  runPipeline({ companies: ['isracard', 'max'] })
+    .then(({ errors }) => {
+      if (errors.length) {
+        getBot().sendMessage(TELEGRAM_CHAT_ID, `⚠️ <b>סריקת כרטיסים נכשלה חלקית</b>\n${errors.join('\n')}`, { parse_mode: 'HTML' }).catch(() => {});
+      }
+    })
+    .catch(e => console.error('[pipeline] unhandled error:', e));
 });
 
 // Daily status summary — triggered by Cloud Scheduler once a day
@@ -68,7 +74,13 @@ app.post('/daily-status', async (req, res) => {
 app.post('/scrape-hapoalim', (req, res) => {
   console.log('[server] /scrape-hapoalim triggered via HTTP');
   res.json({ ok: true });
-  runPipeline({ companies: ['hapoalim'] }).catch(e => console.error('[pipeline] unhandled error:', e));
+  runPipeline({ companies: ['hapoalim'] })
+    .then(({ errors }) => {
+      if (errors.length) {
+        getBot().sendMessage(TELEGRAM_CHAT_ID, `❌ <b>סריקת פועלים נכשלה</b>\n${errors.join('\n')}`, { parse_mode: 'HTML' }).catch(() => {});
+      }
+    })
+    .catch(e => console.error('[pipeline] unhandled error:', e));
 });
 
 if (WEBHOOK_URL) {
@@ -100,11 +112,18 @@ getBot().onText(/\/hapoalim/, async (msg) => {
       '🏦 <b>מתחיל לסרוק פועלים...</b>\nהכן את הטלפון — תכף תגיע בקשת קוד SMS.',
       { parse_mode: 'HTML' }
     );
-    const newCount = await runPipeline({ companies: ['hapoalim'] });
-    await getBot().sendMessage(msg.chat.id,
-      `✅ <b>פועלים הסתיים</b> — ${newCount} עסקאות חדשות`,
-      { parse_mode: 'HTML' }
-    );
+    const { totalNew, errors } = await runPipeline({ companies: ['hapoalim'] });
+    if (errors.length) {
+      await getBot().sendMessage(msg.chat.id,
+        `❌ <b>פועלים נכשל</b>\n${errors.join('\n')}`,
+        { parse_mode: 'HTML' }
+      );
+    } else {
+      await getBot().sendMessage(msg.chat.id,
+        `✅ <b>פועלים הסתיים</b> — ${totalNew} עסקאות חדשות`,
+        { parse_mode: 'HTML' }
+      );
+    }
   } catch (e) {
     console.error('[/hapoalim] error:', e.message);
     await getBot().sendMessage(msg.chat.id, `❌ שגיאה: ${e.message}`).catch(() => {});
@@ -322,6 +341,10 @@ getBot().on('callback_query', async (query) => {
       await getBot().answerCallbackQuery(query.id);
       const doc = await getDb().collection('budget_transactions').doc(txnId).get();
       if (!doc.exists) return;
+      // Without a memo, ruleTextFor collapses to the bare bank description (e.g. "הוראת-קבע"),
+      // which every standing order shares regardless of actual recipient — bulk-applying on
+      // that alone would sweep in unrelated siblings (see feedback_standing_order_bulk_bug).
+      if (!doc.data().memo) return;
       const pattern = ruleTextFor(doc.data()).toLowerCase().trim();
 
       const allSnap = await getDb().collection('budget_transactions').get();
@@ -365,16 +388,22 @@ getBot().on('callback_query', async (query) => {
     const doc = await getDb().collection('budget_transactions').doc(txnId).get();
     if (!doc.exists) return;
     const txn = doc.data();
-    await saveRule(ruleTextFor(txn), category, 'manual');
+    // Without a memo, ruleTextFor collapses to the bare bank description (e.g. "הוראת-קבע"),
+    // which every standing order shares regardless of actual recipient — saving a rule or
+    // suggesting a bulk-apply on that alone would sweep in unrelated siblings.
+    if (txn.memo) await saveRule(ruleTextFor(txn), category, 'manual');
 
     // Check for other transactions with the same description+memo that have a different category
-    const pattern = ruleTextFor(txn).toLowerCase().trim();
-    const allSnap = await getDb().collection('budget_transactions').get();
-    const similarCount = allSnap.docs.filter(d =>
-      d.id !== txnId &&
-      ruleTextFor(d.data()).toLowerCase().includes(pattern) &&
-      d.data().category !== category
-    ).length;
+    let similarCount = 0;
+    if (txn.memo) {
+      const pattern = ruleTextFor(txn).toLowerCase().trim();
+      const allSnap = await getDb().collection('budget_transactions').get();
+      similarCount = allSnap.docs.filter(d =>
+        d.id !== txnId &&
+        ruleTextFor(d.data()).toLowerCase().includes(pattern) &&
+        d.data().category !== category
+      ).length;
+    }
 
     const txnMonth = txn.date?.slice(0, 7) ?? null;
     const budgetInfo = await getMonthlyBudgetInfo(category, txnMonth);

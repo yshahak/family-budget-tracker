@@ -13,6 +13,10 @@ const startDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 console.log(`[hapoalim-local] start date: ${startDate.toISOString().slice(0, 10)}`);
 console.log('[hapoalim-local] Opening browser — enter OTP if prompted via Telegram /otp command...');
 
-const count = await runPipeline({ companies: ['hapoalim'], startDate });
-console.log(`[hapoalim-local] Done — ${count} new transactions.`);
+const { totalNew, errors } = await runPipeline({ companies: ['hapoalim'], startDate });
+console.log(`[hapoalim-local] Done — ${totalNew} new transactions.`);
+if (errors.length) {
+  console.error(`[hapoalim-local] Errors:\n${errors.join('\n')}`);
+  process.exit(1);
+}
 process.exit(0);

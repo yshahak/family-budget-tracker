@@ -43,23 +43,65 @@ function assignOccurrences(txns, accountNumber, owner) {
   return occurrenceByIndex;
 }
 
+// Siblings that share a bank reference number can settle across different scrape runs
+// rather than all in one batch, so the occurrence index computed from the current batch
+// alone can't be trusted to reproduce the one used when the pending doc was created.
+// Probe a range of occurrence values instead — which slot we land on doesn't matter since
+// the memo that arrives on settlement (not the occurrence index) is what disambiguates
+// the sibling; we just need to claim *some* unclaimed matching pending doc.
+const MAX_OCCURRENCE_PROBE = 10;
+
+// Securities purchase orders ("ני"ע-קניה") can settle days later as a net debit
+// ("ני"ע-קניה-נט") for a different amount — price moves between order and settlement — and
+// several gross legs sometimes net into one settlement, so exact date/amount/description
+// matching never resolves them (unlike standing orders, whose amount/description are stable).
+// The bank reference number (identifier) is known even at order time for these, though, so
+// once a completed transaction with that identifier arrives, any still-pending legs placed
+// shortly before it are superseded and can be dropped rather than double-counted forever.
+const IDENTIFIER_SETTLEMENT_WINDOW_DAYS = 5;
+
+async function supersedeStalePendingByIdentifier(col, txn, accountNumber, owner) {
+  if (!txn.identifier) return 0;
+  const snap = await col
+    .where('status', '==', 'pending')
+    .where('identifier', '==', txn.identifier)
+    .where('accountNumber', '==', accountNumber)
+    .where('owner', '==', owner)
+    .get();
+
+  let superseded = 0;
+  for (const doc of snap.docs) {
+    const pendingDate = doc.data().date;
+    if (!pendingDate) continue;
+    const diffDays = (new Date(txn.date) - new Date(pendingDate)) / 86400000;
+    if (diffDays >= 0 && diffDays <= IDENTIFIER_SETTLEMENT_WINDOW_DAYS) {
+      await doc.ref.delete();
+      superseded++;
+    }
+  }
+  return superseded;
+}
+
 export async function filterNewWithDb(txns, accountNumber, owner, db) {
   const col = db.collection('budget_transactions');
   const newTxns = [];
   const resolved = [];
   let pendingResolved = 0;
   const occurrenceByIndex = assignOccurrences(txns, accountNumber, owner);
+  const claimedPendingIds = new Set();
 
   for (let i = 0; i < txns.length; i++) {
     const txn = txns[i];
     const occurrence = occurrenceByIndex.get(i) ?? 0;
     const id = makeTxnId(txn, accountNumber, owner, occurrence);
-    const pendingId = makePendingId(txn, accountNumber, owner, occurrence);
 
     const doc = await col.doc(id).get();
     if (doc.exists) continue; // already known
 
-    if (pendingId !== id) {
+    let resolvedPending = false;
+    for (let probe = 0; probe <= MAX_OCCURRENCE_PROBE; probe++) {
+      const pendingId = makePendingId(txn, accountNumber, owner, probe);
+      if (claimedPendingIds.has(pendingId)) continue;
       const pendingDoc = await col.doc(pendingId).get();
       if (pendingDoc.exists && pendingDoc.data()?.status === 'pending') {
         // Resolve pending → completed. Memo/identifier only become available from the
@@ -70,12 +112,16 @@ export async function filterNewWithDb(txns, accountNumber, owner, db) {
           memo: txn.memo ?? null,
           resolvedAt: new Date(),
         });
+        claimedPendingIds.add(pendingId);
         pendingResolved++;
         resolved.push({ id: pendingId, txn, previousCategorySource: pendingDoc.data()?.categorySource ?? null });
-        continue;
+        resolvedPending = true;
+        break;
       }
     }
+    if (resolvedPending) continue;
 
+    pendingResolved += await supersedeStalePendingByIdentifier(col, txn, accountNumber, owner);
     newTxns.push({ ...txn, _id: id });
   }
 

@@ -24,7 +24,8 @@ const startDate = new Date(new Date().getFullYear(), new Date().getMonth() - 3, 
 console.log(`[backfill-memo] scraping Hapoalim from ${startDate.toISOString().slice(0, 10)}...`);
 console.log('[backfill-memo] Opening browser — enter OTP via Telegram /otp command if prompted...');
 
-const results = await scrapeAll(startDate, { companies: ['hapoalim'] });
+const { results, errors } = await scrapeAll(startDate, { companies: ['hapoalim'] });
+if (errors.length) console.error(`[backfill-memo] Errors:\n${errors.join('\n')}`);
 const db = getDb();
 const col = db.collection('budget_transactions');
 

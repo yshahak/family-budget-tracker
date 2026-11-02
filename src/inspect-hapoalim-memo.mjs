@@ -23,7 +23,8 @@ const startDate = new Date(new Date().getFullYear(), new Date().getMonth() - 2, 
 console.log(`[inspect] scraping Hapoalim from ${startDate.toISOString().slice(0, 10)}...`);
 console.log('[inspect] Opening browser — enter OTP via Telegram /otp command if prompted...');
 
-const results = await scrapeAll(startDate, { companies: ['hapoalim'] });
+const { results, errors } = await scrapeAll(startDate, { companies: ['hapoalim'] });
+if (errors.length) console.error(`[inspect] Errors:\n${errors.join('\n')}`);
 
 for (const { owner, accountNumber, txns } of results) {
   for (const txn of txns) {

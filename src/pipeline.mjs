@@ -13,12 +13,12 @@ export async function runPipeline({ companies, startDate: startDateOverride } = 
   })();
   logger.info('[pipeline] Start date', { startDate: startDate.toISOString().slice(0, 10) });
 
-  const accounts = await scrapeAll(startDate, { companies });
+  const { results: accounts, errors: scrapeErrors } = await scrapeAll(startDate, { companies });
   let totalNew = 0;
   let totalFound = 0;
   let totalPendingResolved = 0;
   const profiles = [];
-  const errors = [];
+  const errors = [...scrapeErrors];
 
   for (const { owner, accountNumber, txns } of accounts) {
     profiles.push(`${owner}/${accountNumber}`);
@@ -89,5 +89,5 @@ export async function runPipeline({ companies, startDate: startDateOverride } = 
     errors,
   });
 
-  return totalNew;
+  return { totalNew, errors };
 }
