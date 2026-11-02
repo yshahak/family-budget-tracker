@@ -1,6 +1,7 @@
 import { getAllBucketsStatus, getMonthlyTransactionsForBucket, BUDGET_BUCKETS } from './budget.mjs';
 import { CATEGORY_EMOJI } from './categories.mjs';
 import { DISPLAY_NAME } from './config.mjs';
+import { formatTxnDate } from './notifier.mjs';
 
 const MAX_TXN_LINES = 25;
 
@@ -138,7 +139,7 @@ export async function buildBucketMessage(bucketName, month = null) {
   } else {
     const shown = txns.slice(0, MAX_TXN_LINES);
     for (const t of shown) {
-      const date = t.date.slice(5, 10).replace('-', '/');
+      const date = formatTxnDate(t.date);
       const amount = Math.abs(t.chargedAmount).toFixed(0);
       const ownerFull = DISPLAY_NAME[t.owner] || t.owner || '';
       const owner = ownerFull.slice(0, 1) + '׳';
@@ -166,7 +167,7 @@ export function buildBucketKeyboard(bucketName, txns = [], month = null) {
   rows.push(navRow);
 
   for (const t of txns.slice(0, MAX_TXN_LINES)) {
-    const date = t.date.slice(5, 10).replace('-', '/');
+    const date = formatTxnDate(t.date);
     const amount = Math.abs(t.chargedAmount).toFixed(0);
     const desc = t.description.slice(0, 22);
     rows.push([{

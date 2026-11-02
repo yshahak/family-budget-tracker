@@ -4,6 +4,16 @@ import { CATEGORIES, CATEGORY_EMOJI } from './categories.mjs';
 
 let bot = null;
 
+// Stored dates are Israel-midnight expressed in UTC (e.g. 2026-10-31T22:00Z == Nov 1 in Israel),
+// so slicing the ISO string shows the previous day. Format in Asia/Jerusalem instead.
+// Display only — never change the stored date: it is part of the dedup hash.
+export function formatTxnDate(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return String(iso).slice(5, 10).replace('-', '/');
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit' }).formatToParts(d);
+  return `${parts.find(x => x.type === 'month').value}/${parts.find(x => x.type === 'day').value}`;
+}
+
 export function getBot() {
   if (bot) return bot;
   if (WEBHOOK_URL) {
@@ -62,7 +72,7 @@ function budgetLine(budgetInfo) {
 
 export function buildText(txn, accountNumber, owner, category, budgetInfo = null, ignored = false) {
   const amount = formatAmount(txn);
-  const date = txn.date.slice(5, 10).replace('-', '/');
+  const date = formatTxnDate(txn.date);
   const ownerLabel = DISPLAY_NAME[owner] || owner;
 
   if (ignored) {
