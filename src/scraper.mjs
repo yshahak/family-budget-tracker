@@ -126,7 +126,7 @@ export async function scrapeAll(startDate, { companies, delayMs = 0 } = {}) {
         } else {
           console.log(`[scraper] ${profile.name} / account ${account.accountNumber}: ${txns.length} txns`);
         }
-        results.push({ owner: profile.name, accountNumber: account.accountNumber, txns });
+        results.push({ owner: profile.name, company: profile.company, accountNumber: account.accountNumber, txns });
       }
     } catch (e) {
       const msg = `${profile.name} threw: ${e.message}`;

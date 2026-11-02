@@ -128,6 +128,36 @@ export async function filterNewWithDb(txns, accountNumber, owner, db) {
   return { newTxns, pendingResolved, resolved };
 }
 
+// A pending doc whose transaction no longer shows up as pending in a fresh scrape has settled
+// (usually as a completed doc with a different date/description/amount, so the exact-match
+// resolution above never claimed it) or was cancelled — either way it must not keep counting
+// next to its completed twin. Only trusts a scrape that actually covers the pending doc's date
+// (>= startDate) and ignores docs younger than a day, to avoid racing the bank's own lag.
+const STALE_PENDING_MIN_AGE_MS = 24 * 3600 * 1000;
+
+export async function purgeStalePending(txns, accountNumber, owner, startDate, db = getDb()) {
+  const livePending = new Set(
+    txns.filter(t => t.status === 'pending').map(t => `${t.date}|${t.description}|${t.chargedAmount}`)
+  );
+  const snap = await db.collection('budget_transactions')
+    .where('status', '==', 'pending')
+    .where('accountNumber', '==', accountNumber)
+    .where('owner', '==', owner)
+    .get();
+
+  const purged = [];
+  for (const doc of snap.docs) {
+    const d = doc.data();
+    if (!d.date || new Date(d.date) < startDate) continue;
+    const created = d.createdAt?.toDate?.() ?? new Date(d.createdAt);
+    if (Date.now() - created.getTime() < STALE_PENDING_MIN_AGE_MS) continue;
+    if (livePending.has(`${d.date}|${d.description}|${d.chargedAmount}`)) continue;
+    await doc.ref.delete();
+    purged.push({ id: doc.id, date: d.date, description: d.description, chargedAmount: d.chargedAmount });
+  }
+  return purged;
+}
+
 export async function filterNew(txns, accountNumber, owner) {
   const db = getDb();
   return filterNewWithDb(txns, accountNumber, owner, db);

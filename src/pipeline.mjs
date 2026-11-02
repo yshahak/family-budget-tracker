@@ -1,5 +1,5 @@
 import { scrapeAll } from './scraper.mjs';
-import { filterNew, saveTxn, updateTelegramMessageId, updateCategoryAuto } from './dedup.mjs';
+import { filterNew, purgeStalePending, saveTxn, updateTelegramMessageId, updateCategoryAuto } from './dedup.mjs';
 import { categorize } from './categorizer.mjs';
 import { sendTransaction } from './notifier.mjs';
 import { getMonthlyBudgetInfo } from './budget.mjs';
@@ -20,7 +20,7 @@ export async function runPipeline({ companies, startDate: startDateOverride } = 
   const profiles = [];
   const errors = [...scrapeErrors];
 
-  for (const { owner, accountNumber, txns } of accounts) {
+  for (const { owner, company, accountNumber, txns } of accounts) {
     profiles.push(`${owner}/${accountNumber}`);
     totalFound += txns.length;
 
@@ -32,6 +32,15 @@ export async function runPipeline({ companies, startDate: startDateOverride } = 
       logger.error(msg, { owner, accountNumber, error: err.message });
       errors.push(msg);
       continue;
+    }
+
+    if (company === 'hapoalim') {
+      try {
+        const purged = await purgeStalePending(txns, accountNumber, owner, startDate);
+        if (purged.length) logger.info(`[pipeline] ${owner}/${accountNumber}: purged ${purged.length} stale pending`, { purged });
+      } catch (err) {
+        logger.error(`purgeStalePending failed for ${owner}/${accountNumber}: ${err.message}`, { error: err.message });
+      }
     }
 
     newTxns = newTxns.filter(t => t.chargedAmount !== 0);
